@@ -22,25 +22,30 @@ nginx_root_path = "/etc/nginx/sites-available"
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 artifacts_dir = Path().home().joinpath(".deployment_artifacts")
+stage_file = artifacts_dir.joinpath("stage.json")
+previous_stages = {}
 if not artifacts_dir.exists():
     artifacts_dir.mkdir(parents=True, exist_ok=True)
 
 
-logger.info(f"Artifacts directory: {artifacts_dir.absolute()}")
-stage_file = artifacts_dir.joinpath("stage.json")
-if not stage_file.exists():
-    stage_file.touch()
-    stage_file.write_text("{}")
+def load_artifacts(root_path):
+    global previous_stages
+    global artifacts_dir
+    global stage_file
 
+    artifacts_dir = root_path.joinpath(".deployment_artifacts")
+    logger.info(f"Artifacts directory: {artifacts_dir.absolute()}")
+    stage_file = artifacts_dir.joinpath("stage.json")
+    if not stage_file.exists():
+        stage_file.touch()
+        stage_file.write_text("{}")
 
-previous_stages = {}
-try:
-    with open(stage_file, "r") as f:
-        previous_stages = json.load(f)
-except Exception:
-    pass
+    try:
+        with open(stage_file, "r") as f:
+            previous_stages = json.load(f)
+    except Exception:
+        pass
 
 
 class DeploymentException(Exception):
@@ -431,6 +436,7 @@ def setup_nginx(django_project_path: Path, domain_name: Optional[str]):
 
 
 @click.command()
+@click.option("--root-path", prompt="Root Path", help="Path to store project files")
 @click.option("--project-name", prompt="Project name", help="Project name")
 @click.option("--sudo/--no-sudo", prompt="Use sudo", help="Use sudo", default=True)
 # @click.option("--db-name", prompt="Database name", help="Database name")
@@ -444,6 +450,7 @@ def setup_nginx(django_project_path: Path, domain_name: Optional[str]):
 @click.option("--migrate/--no-migrate", prompt="Migrate", help="Migrate", default=True)
 @click.option("--collectstatic/--no-collectstatic", prompt="Collect static", help="Collect static", default=True)
 def main(
+    root_path: str,
     project_name: str,
     sudo: bool,
     # db_name: str,
@@ -461,6 +468,8 @@ def main(
     # print all cli options
     global PROJECT_NAME
     PROJECT_NAME = project_name
+    home_dir = Path(root_path)
+    load_artifacts(root_path=home_dir)
 
     os.environ["DEBIAN_FRONTEND"] = "noninteractive"
 
@@ -469,7 +478,6 @@ def main(
     install_python_packages()
     # create_postgres_resources(db_name, db_user, db_password, db_host, db_port)
     # get home dir
-    home_dir = Path.home()
     project_dir = home_dir.joinpath(project_name).joinpath(project_name)
     logger.info(f"Project dir: {project_dir}")
 
