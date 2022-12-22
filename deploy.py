@@ -256,6 +256,15 @@ def clone_git_repo(repo_url: str, branch: str = "master", destination_dir: Path 
     logger.info("Git repo cloned")
 
 
+def pull_latest_changes(project_dir: Path):
+    current_dir = os.getcwd()
+    logger.info("Pulling latest changes")
+    os.chdir(project_dir)
+    run_command(["git", "pull"], use_sudo=False)
+    os.chdir(current_dir)
+    return
+
+
 @raise_for_deployment()
 @update_stage("install_create_activate_virtualenv")
 def install_create_activate_virtualenv(project_dir: Path, venv_path: Path):
@@ -466,6 +475,7 @@ def main(
 
     create_project_dir(project_dir=project_dir)
     clone_git_repo(repo_url=git_repo, branch=git_branch, destination_dir=project_dir)
+    pull_latest_changes(project_dir=project_dir)
 
     venv_path = project_dir.parent.joinpath("venv")
     venv_path_str = str(venv_path.absolute())
