@@ -129,20 +129,19 @@ def activate_venv(venv_path):
         logger.info("Virtualenv activated")
 
 
-def get_service_manager():
-    which_service = subprocess.run(["which", "service"])
-    which_systemctl = subprocess.run(["which", "systemctl"])
-    if which_service.returncode == 0:
-        return "service"
+# def get_service_manager():
+#     which_service = subprocess.run(["which", "service"])
+#     which_systemctl = subprocess.run(["which", "systemctl"])
+#     if which_systemctl.returncode == 0:
+#         return "systemctl"
+#     if which_service.returncode == 0:
+#         return "service"
 
-    if which_systemctl.returncode == 0:
-        return "systemctl"
-
-    raise DeploymentException("Failed to find service or systemctl")
+#     raise DeploymentException("Failed to find service or systemctl")
 
 
 def restart_services():
-    service_manager = get_service_manager()
+    service_manager = "systemctl"
     # restart/start gunicorn
     run_command([service_manager, "restart", "gunicorn"], use_sudo=True)
 
