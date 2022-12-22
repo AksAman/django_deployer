@@ -1,4 +1,10 @@
 #!/usr/bin/python3
+
+"""
+./deploy.py --project-name="base_django_app" --sudo --git-repo="https://github.com/AksAman/django-base-app" --git-branch="master" --domain-name "example
+.com" --no-migrate --no-collectstatic
+"""
+
 try:
     import click
 except ImportError:
@@ -15,7 +21,7 @@ from typing import List, Optional
 
 VENV_ACTIVE = False
 PROJECT_NAME = None
-gunicorn_service_path = f"/etc/systemd/system/gunicorn.service"
+gunicorn_service_path = lambda project_name: f"/etc/supervisor/conf.d/{project_name}-gunicorn.conf"
 gunicorn_socket_path = f"/etc/systemd/system/gunicorn.socket"
 nginx_root_path = "/etc/nginx/sites-available"
 
@@ -129,25 +135,19 @@ def activate_venv(venv_path):
         logger.info("Virtualenv activated")
 
 
-def get_service_manager():
-    which_service = subprocess.run(["which", "service"])
-    which_systemctl = subprocess.run(["which", "systemctl"])
-    if which_service.returncode == 0:
-        return "service"
-
-    if which_systemctl.returncode == 0:
-        return "systemctl"
-
-    raise DeploymentException("Failed to find service or systemctl")
-
-
 def restart_services():
-    service_manager = get_service_manager()
+    # restart supervisor
+    run_command(["service", "supervisor", "restart"], use_sudo=True)
+    # sudo supervisorctl reread
+    # sudo supervisorctl update
+    # run_command(["supervisorctl", "reread"], use_sudo=True)
+    # run_command(["supervisorctl", "update"], use_sudo=True)
+
     # restart/start gunicorn
-    run_command([service_manager, "restart", "gunicorn"], use_sudo=True)
+    run_command(["supervisorctl", "restart", "gunicorn"], use_sudo=True)
 
     # restart/start nginx
-    run_command([service_manager, "restart", "nginx"], use_sudo=True)
+    run_command(["service", "nginx", "restart"], use_sudo=True)
 
 
 @raise_for_deployment()
@@ -342,26 +342,15 @@ def get_gunicorn_path(venv_path: str):
 @raise_for_deployment()
 @update_stage("write_gunicorn_config_files")
 def write_gunicorn_config_files(gunicorn_path: str, django_project_path: Path):
-    def write_gunicorn_socket():
-        try:
-            src = Path(".").joinpath("templates/gunicorn.socket")
-            with open(src, "r") as f:
-                content = f.read()
-
-            with open(gunicorn_socket_path, "w") as f:
-                f.write(content)
-        except Exception as e:
-            logger.error(f"Error creating gunicorn.socket file: {e}")
-            raise DeploymentException("Error creating gunicorn.socket file")
-
     def write_gunicorn_service():
         try:
-            src = Path(".").joinpath("templates/gunicorn.service")
+            src = Path(".").joinpath("templates/gunicorn.conf")
             with open(src, "r") as f:
                 content = f.read()
 
             # vars = {{USER}}, {{GROUP}}, {{APP_NAME}}, {{PROJECT_PATH}}, {{GUNICORN_PATH}}
             current_user = getpass.getuser()
+            global PROJECT_NAME
             content = content.replace("{{USER}}", current_user)
             content = content.replace("{{GROUP}}", "www-data")
             content = content.replace("{{APP_NAME}}", django_project_path.name)
@@ -370,17 +359,16 @@ def write_gunicorn_config_files(gunicorn_path: str, django_project_path: Path):
 
             # TODO: add workers as a parameter
 
-            with open(gunicorn_service_path, "w") as f:
+            with open(gunicorn_service_path(django_project_path.name), "w") as f:
                 f.write(content)
         except Exception as e:
-            logger.error(f"Error creating gunicorn.service file: {e}")
-            raise DeploymentException("Error creating gunicorn.service file")
+            logger.error(f"Error creating gunicorn.conf file: {e}")
+            raise DeploymentException("Error creating gunicorn.conf file")
 
     logger.info("Writing gunicorn config files")
     django_project_path_str = str(django_project_path.absolute())
 
-    logger.info(f"Creating gunicorn.socket file")
-    write_gunicorn_socket()
+    logger.info(f"Creating gunicorn.conf file")
     write_gunicorn_service()
 
 
