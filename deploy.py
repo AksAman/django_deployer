@@ -85,7 +85,7 @@ def update_stage(stage_name: str):
         project_stages: dict = previous_stages.setdefault(PROJECT_NAME, {})
         project_stages[stage_name] = True
         with open(stage_file, "w") as f:
-            json.dump(previous_stages, f)
+            json.dump(previous_stages, f, indent=4)
 
     def decorator(func):
         def wrapper(*args, **kwargs):
@@ -248,7 +248,7 @@ def clone_git_repo(repo_url: str, branch: str = "master", destination_dir: Path 
     :return: The path to the cloned repo
     """
     logger.info(f"Cloning git repo to {destination_dir}")
-    if destination_dir.exists():
+    if destination_dir.exists() and len(os.listdir(destination_dir)) > 0:
         logger.info("Git repo already cloned")
         return
     destination_dir_str = str(destination_dir.absolute())
@@ -450,6 +450,8 @@ def main(
     # print all cli options
     global PROJECT_NAME
     PROJECT_NAME = project_name
+
+    os.environ["DEBIAN_FRONTEND"] = "noninteractive"
 
     update_system(use_sudo=sudo)
     install_apt_packages(use_sudo=sudo)
