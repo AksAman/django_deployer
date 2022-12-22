@@ -172,7 +172,7 @@ def install_apt_packages(use_sudo: bool = True):
         "zsh",
         "git",
         "systemd",
-        "supervisor",
+        "python3-venv",
     ]
     # run apt install without any user input
     run_command(["sudo", "apt", "install", "-y"] + package_list, use_sudo=use_sudo)
@@ -268,11 +268,16 @@ def install_create_activate_virtualenv(project_dir: Path, venv_path: Path):
     run_command(["pip3", "install", "--upgrade", "pip"], use_sudo=False)
     logger.info("Pip upgraded")
 
+    # install virtualenv
+    logger.info("Installing virtualenv")
+    run_command(["pip3", "install", "virtualenv"], use_sudo=False)
+    logger.info("Virtualenv installed")
+
     venv_path_str = str(venv_path.absolute())
 
     # create virtualenv
     logger.info("Creating virtualenv")
-    run_command(["python3", "-m", "venv", venv_path_str], use_sudo=False)
+    run_command(["virtualenv", "-p", "python3", venv_path_str], use_sudo=False)
     logger.info("Virtualenv created")
 
     # activate virtualenv
