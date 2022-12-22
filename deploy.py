@@ -149,6 +149,7 @@ def restart_services():
     service_manager = "systemctl"
     # daemon_reload
     run_command([service_manager, "daemon-reload"], use_sudo=True)
+    logger.info("Daemon reloaded")
 
     # restart/start gunicorn
     run_command([service_manager, "restart", "gunicorn"], use_sudo=True)
