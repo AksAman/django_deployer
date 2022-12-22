@@ -277,7 +277,9 @@ def install_create_activate_virtualenv(project_dir: Path, venv_path: Path):
 
     # create virtualenv
     logger.info("Creating virtualenv")
-    run_command(["virtualenv", "-p", "python3", venv_path_str], use_sudo=False)
+    # run_command(["virtualenv", "-p", "python3", venv_path_str], use_sudo=False)
+    run_command(["python3", "-m", "venv", venv_path_str], use_sudo=False)
+
     logger.info("Virtualenv created")
 
     # activate virtualenv
