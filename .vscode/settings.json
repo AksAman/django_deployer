@@ -1,0 +1,29 @@
+{
+    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.diagnosticMode": "workspace",
+    "python.analysis.exclude": [],
+    "python.analysis.autoImportCompletions": true,
+    "python.linting.pylintEnabled": false,
+    "python.linting.flake8Enabled": true,
+    "python.linting.enabled": true,
+    "python.linting.flake8Args": [
+        "--max-line-length=120",
+        "--ignore=E501, E402, E731, W503, W504"
+    ],
+    "python.linting.pylintArgs": [
+        "--max-line-length=120",
+        "--errors-only",
+        "--disable=E0401"
+    ],
+    "python.formatting.provider": "black",
+    "[python]": {
+        "editor.formatOnSave": true
+    },
+    "[html]": {
+        "editor.formatOnSave": false
+    },
+    "python.formatting.blackArgs": [
+        "--line-length=120"
+    ],
+    "files.exclude": {}
+}
