@@ -147,11 +147,16 @@ def activate_venv(venv_path):
 
 def restart_services():
     service_manager = "systemctl"
+    # daemon_reload
+    run_command([service_manager, "daemon-reload"], use_sudo=True)
+
     # restart/start gunicorn
     run_command([service_manager, "restart", "gunicorn"], use_sudo=True)
+    logger.info("Gunicorn restarted")
 
     # restart/start nginx
     run_command([service_manager, "restart", "nginx"], use_sudo=True)
+    logger.info("Nginx restarted")
 
 
 @raise_for_deployment()
