@@ -1,9 +1,5 @@
 #!/usr/bin/python3
 
-"""
-./deploy.py --project-name="base_django_app" --sudo --git-repo="https://github.com/AksAman/django-base-app" --git-branch="master" --domain-name "example
-.com" --no-migrate --no-collectstatic
-"""
 
 try:
     import click
