@@ -7,12 +7,14 @@ except ImportError:
 
 import getpass
 import json
-from pathlib import Path
-import subprocess
 import logging
+import os
+import subprocess
+from pathlib import Path
 from typing import List, Optional
 
 VENV_ACTIVE = False
+PROJECT_NAME = None
 gunicorn_service_path = f"/etc/systemd/system/gunicorn.service"
 gunicorn_socket_path = f"/etc/systemd/system/gunicorn.socket"
 nginx_root_path = "/etc/nginx/sites-available"
@@ -21,11 +23,12 @@ nginx_root_path = "/etc/nginx/sites-available"
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-artifacts_dir = Path(".").joinpath("deployment_artifacts")
+artifacts_dir = Path().home().joinpath(".deployment_artifacts")
 if not artifacts_dir.exists():
     artifacts_dir.mkdir(parents=True, exist_ok=True)
 
 
+logger.info(f"Artifacts directory: {artifacts_dir.absolute()}")
 stage_file = artifacts_dir.joinpath("stage.json")
 if not stage_file.exists():
     stage_file.touch()
@@ -48,11 +51,11 @@ class InstallationException(Exception):
     pass
 
 
-def run_command(command: List[str], use_sudo: bool = True):
+def run_command(command: List[str], use_sudo: bool = True, raise_on_error: bool = True):
     if use_sudo:
         command = ["sudo"] + command
     process = subprocess.run(command)
-    if process.returncode != 0:
+    if process.returncode != 0 and raise_on_error:
         raise DeploymentException(f"Failed to run command: {command}")
 
 
@@ -66,26 +69,28 @@ def get_public_ip() -> Optional[str]:
         return None
 
 
-def activate_venv(venv_path):
-    global VENV_ACTIVE
-    if not VENV_ACTIVE:
-        logger.info("Activating virtualenv")
-    run_command(["source", f"{venv_path}/bin/activate"], use_sudo=False)
-    VENV_ACTIVE = True
-    if not VENV_ACTIVE:
-        logger.info("Virtualenv activated")
+def shell_source(script):
+    """Sometime you want to emulate the action of "source" in bash,
+    settings some environment variables. Here is a way to do it."""
+    pipe = subprocess.Popen(". %s; env" % script, stdout=subprocess.PIPE, shell=True)
+    output = pipe.communicate()[0].decode("utf-8")
+    env = dict((line.split("=", 1) for line in output.splitlines()))
+    os.environ.update(env)
 
 
 def update_stage(stage_name: str):
     def update_stage_file(stage_name: str):
         global previous_stages
-        previous_stages[stage_name] = True
+        global PROJECT_NAME
+        project_stages: dict = previous_stages.setdefault(PROJECT_NAME, {})
+        project_stages[stage_name] = True
         with open(stage_file, "w") as f:
             json.dump(previous_stages, f)
 
     def decorator(func):
         def wrapper(*args, **kwargs):
-            if previous_stages.get(stage_name):
+            project_stages: dict = previous_stages.setdefault(PROJECT_NAME, {})
+            if project_stages.get(stage_name):
                 logger.info(f"Stage {stage_name} already completed")
                 return
             func(*args, **kwargs)
@@ -96,21 +101,64 @@ def update_stage(stage_name: str):
     return decorator
 
 
+def raise_for_deployment():
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            try:
+                func(*args, **kwargs)
+            except DeploymentException as e:
+                logger.error(e)
+                exit(1)
+
+        return wrapper
+
+    return decorator
+
+
+@raise_for_deployment()
+def activate_venv(venv_path):
+    global VENV_ACTIVE
+    if not VENV_ACTIVE:
+        logger.info("Activating virtualenv")
+        shell_source(f"{venv_path}/bin/activate")
+        environ = os.environ.copy()
+        if "VIRTUAL_ENV" not in environ:
+            raise DeploymentException("Failed to activate virtualenv")
+    VENV_ACTIVE = True
+    if not VENV_ACTIVE:
+        logger.info("Virtualenv activated")
+
+
+def get_service_manager():
+    which_service = subprocess.run(["which", "service"])
+    which_systemctl = subprocess.run(["which", "systemctl"])
+    if which_service.returncode == 0:
+        return "service"
+
+    if which_systemctl.returncode == 0:
+        return "systemctl"
+
+    raise DeploymentException("Failed to find service or systemctl")
+
+
 def restart_services():
+    service_manager = get_service_manager()
     # restart/start gunicorn
-    run_command(["systemctl", "restart", "gunicorn"], use_sudo=True)
+    run_command([service_manager, "restart", "gunicorn"], use_sudo=True)
 
     # restart/start nginx
-    run_command(["systemctl", "restart", "nginx"], use_sudo=True)
+    run_command([service_manager, "restart", "nginx"], use_sudo=True)
 
 
+@raise_for_deployment()
 @update_stage("update_system")
 def update_system(use_sudo: bool = True):
     logger.info("Updating system")
-    run_command(["sudo", "apt", "update"], use_sudo=use_sudo)
+    run_command(["sudo", "apt", "update", "-y"], use_sudo=use_sudo)
     logger.info("System updated")
 
 
+@raise_for_deployment()
 @update_stage("install_apt_packages")
 def install_apt_packages(use_sudo: bool = True):
     logger.info("Installing apt packages")
@@ -124,12 +172,15 @@ def install_apt_packages(use_sudo: bool = True):
         "postgresql-contrib",
         "zsh",
         "git",
+        "systemd",
+        "supervisor",
     ]
     # run apt install without any user input
     run_command(["sudo", "apt", "install", "-y"] + package_list, use_sudo=use_sudo)
     logger.info(f"{len(package_list)} Apt packages installed")
 
 
+@raise_for_deployment()
 @update_stage("install_python_packages")
 def install_python_packages():
     packages = [
@@ -140,6 +191,7 @@ def install_python_packages():
     run_command(["pip3", "install"] + packages, use_sudo=False)
 
 
+@raise_for_deployment()
 @update_stage("create_postgres_resources")
 def create_postgres_resources(db_name, db_user, db_password, db_host, db_port):
     # try:
@@ -178,6 +230,7 @@ def create_postgres_resources(db_name, db_user, db_password, db_host, db_port):
     logger.info("Postgres resources created")
 
 
+@raise_for_deployment()
 @update_stage("create_project_dir")
 def create_project_dir(project_dir: Path):
     logger.info("Creating project dir")
@@ -185,8 +238,9 @@ def create_project_dir(project_dir: Path):
     logger.info("Project dir created")
 
 
+@raise_for_deployment()
 @update_stage("clone_git_repo")
-def clone_git_repo(repo_url: str, branch: str = "master", destination_dir: Path = Path(".")) -> Path:
+def clone_git_repo(repo_url: str, branch: str = "master", destination_dir: Path = Path(".")):
     """
     Clones the git repo in the destination directory
     :param repo_url: The url of the git repo
@@ -194,20 +248,18 @@ def clone_git_repo(repo_url: str, branch: str = "master", destination_dir: Path 
     :param destination_dir: The directory to clone the repo in
     :return: The path to the cloned repo
     """
-    logger.info("Cloning git repo")
-    git_repo_name = repo_url.split("/")[-1].split(".")[0]
-    cloned_path = destination_dir.joinpath(git_repo_name)
-    if cloned_path.exists():
+    logger.info(f"Cloning git repo to {destination_dir}")
+    if destination_dir.exists():
         logger.info("Git repo already cloned")
-        return cloned_path
+        return
     destination_dir_str = str(destination_dir.absolute())
     run_command(["git", "clone", "-b", branch, repo_url, destination_dir_str], use_sudo=False)
     logger.info("Git repo cloned")
-    return cloned_path
 
 
+@raise_for_deployment()
 @update_stage("install_create_activate_virtualenv")
-def install_create_activate_virtualenv(project_dir: Path) -> str:
+def install_create_activate_virtualenv(project_dir: Path, venv_path: Path):
     """
     Installs virtualenv and creates a virtualenv in the project directory
     Returns the path to the virtualenv
@@ -222,27 +274,32 @@ def install_create_activate_virtualenv(project_dir: Path) -> str:
     run_command(["pip3", "install", "virtualenv"], use_sudo=False)
     logger.info("Virtualenv installed")
 
-    project_dir_str = str(project_dir.absolute())
-    # create virtualenv
-    venv_path = f"{project_dir_str}/venv"
+    venv_path_str = str(venv_path.absolute())
 
+    # create virtualenv
     logger.info("Creating virtualenv")
-    project_dir_str = str(project_dir.absolute())
-    run_command(["virtualenv", "-p", "python3", venv_path], use_sudo=False)
+    run_command(["virtualenv", "-p", "python3", venv_path_str], use_sudo=False)
     logger.info("Virtualenv created")
 
     # activate virtualenv
     activate_venv(venv_path)
 
-    return f"{project_dir_str}/venv"
 
-
+@raise_for_deployment()
 @update_stage("install_project_dependencies")
 def install_project_dependencies(venv_path: str, project_dir: Path):
     activate_venv(venv_path)
     logger.info("Installing project dependencies")
     project_dir_str = str(project_dir.absolute())
-    run_command(["pip3", "install", "-r", f"{project_dir_str}/requirements.txt"], use_sudo=False)
+    requirements_file = project_dir.joinpath("requirements.txt")
+    if not requirements_file.exists():
+        requirements_file = project_dir.joinpath("chill.requirements.txt")
+    if not requirements_file.exists():
+        logger.warn("No requirements.txt file found")
+        return
+
+    requirements_file_str = str(requirements_file.absolute())
+    run_command(["pip3", "install", "-r", requirements_file_str], use_sudo=False)
     logger.info("Project dependencies installed")
 
 
@@ -255,6 +312,7 @@ def migrate_db(venv_path: str, django_project_path: Path):
     logger.info("Database migrated")
 
 
+@raise_for_deployment()
 @update_stage("collect_static")
 def collect_static(venv_path: str, django_project_path: Path):
     activate_venv(venv_path)
@@ -264,20 +322,24 @@ def collect_static(venv_path: str, django_project_path: Path):
     logger.info("Static collected")
 
 
+@raise_for_deployment()
 @update_stage("install_gunicorn")
-def install_gunicorn(venv_path: str, django_project_path: Path) -> str:
+def install_gunicorn(venv_path: str):
     activate_venv(venv_path)
     logger.info("Setting up gunicorn")
     # install gunicorn
     run_command(["pip3", "install", "gunicorn"], use_sudo=False)
     logger.info("Gunicorn installed")
 
+
+def get_gunicorn_path(venv_path: str):
+    activate_venv(venv_path)
     gunicorn_path = subprocess.check_output(["which", "gunicorn"]).decode("utf-8").strip()
     logger.info(f"Gunicorn path: {gunicorn_path}")
-
     return gunicorn_path
 
 
+@raise_for_deployment()
 @update_stage("write_gunicorn_config_files")
 def write_gunicorn_config_files(gunicorn_path: str, django_project_path: Path):
     def write_gunicorn_socket():
@@ -322,6 +384,7 @@ def write_gunicorn_config_files(gunicorn_path: str, django_project_path: Path):
     write_gunicorn_service()
 
 
+@raise_for_deployment()
 @update_stage("setup_nginx")
 def setup_nginx(django_project_path: Path, domain_name: Optional[str]):
     if not domain_name:
@@ -351,7 +414,7 @@ def setup_nginx(django_project_path: Path, domain_name: Optional[str]):
         raise DeploymentException("Error creating nginx config file")
 
     # enable nginx config file
-    run_command(["ln", "-s", nginx_config_path, f"/etc/nginx/sites-enabled"], use_sudo=True)
+    run_command(["ln", "-s", nginx_config_path, f"/etc/nginx/sites-enabled"], use_sudo=True, raise_on_error=False)
 
     # remove default nginx config file
     # run_command(["rm", f"/etc/nginx/sites-enabled/default"], use_sudo=True)
@@ -367,7 +430,9 @@ def setup_nginx(django_project_path: Path, domain_name: Optional[str]):
 # @click.option("--db-port", prompt="Database port", help="Database port")
 @click.option("--git-repo", prompt="Git repo", help="Git repo")
 @click.option("--git-branch", prompt="Git branch", help="Git branch", default="master")
-@click.option("--domain-name", prompt="Domain", help="Domain")
+@click.option("--domain-name", prompt="Domain", help="Domain", default=None)
+@click.option("--migrate/--no-migrate", prompt="Migrate", help="Migrate", default=True)
+@click.option("--collectstatic/--no-collectstatic", prompt="Collect static", help="Collect static", default=True)
 def main(
     project_name: str,
     sudo: bool,
@@ -379,30 +444,44 @@ def main(
     git_repo: str,
     git_branch: str,
     domain_name: Optional[str] = None,
+    migrate: bool = True,
+    collectstatic: bool = True,
 ):
     # print(f"{sudo=} {db_name=} {db_user=} {db_password=} {db_host=} {db_port=} {git_repo=}")
     # print all cli options
+    global PROJECT_NAME
+    PROJECT_NAME = project_name
 
     update_system(use_sudo=sudo)
     install_apt_packages(use_sudo=sudo)
     install_python_packages()
     # create_postgres_resources(db_name, db_user, db_password, db_host, db_port)
-    project_dir = Path(project_name)
+    # get home dir
+    home_dir = Path.home()
+    project_dir = home_dir.joinpath(project_name).joinpath(project_name)
+    logger.info(f"Project dir: {project_dir}")
 
     create_project_dir(project_dir=project_dir)
-    cloned_path = clone_git_repo(repo_url=git_repo, branch=git_branch, destination_dir=project_dir)
+    clone_git_repo(repo_url=git_repo, branch=git_branch, destination_dir=project_dir)
 
-    venv_path = install_create_activate_virtualenv(project_dir=project_dir)
-    install_project_dependencies(venv_path=venv_path, project_dir=project_dir)
+    venv_path = project_dir.parent.joinpath("venv")
+    venv_path_str = str(venv_path.absolute())
 
-    migrate_db(venv_path=venv_path, django_project_path=cloned_path)
-    collect_static(venv_path=venv_path, django_project_path=cloned_path)
+    install_create_activate_virtualenv(project_dir=project_dir, venv_path=venv_path)
+    install_project_dependencies(venv_path=venv_path_str, project_dir=project_dir)
 
-    gunicorn_path = install_gunicorn(venv_path=venv_path, django_project_path=cloned_path)
-    write_gunicorn_config_files(gunicorn_path=gunicorn_path, django_project_path=cloned_path)
+    if migrate:
+        migrate_db(venv_path=venv_path_str, django_project_path=project_dir)
+
+    if collectstatic:
+        collect_static(venv_path=venv_path_str, django_project_path=project_dir)
+
+    install_gunicorn(venv_path=venv_path_str)
+    gunicorn_path = get_gunicorn_path(venv_path=venv_path_str)
+    write_gunicorn_config_files(gunicorn_path=gunicorn_path, django_project_path=project_dir)
 
     # setup nginx
-    setup_nginx(django_project_path=cloned_path, domain_name=domain_name)
+    setup_nginx(django_project_path=project_dir, domain_name=domain_name)
 
     restart_services()
 
