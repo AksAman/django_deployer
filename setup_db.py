@@ -5,8 +5,6 @@ except ImportError:
     print("Please install click with pip3 install click")
     exit(1)
 
-import getpass
-import json
 import logging
 import os
 import subprocess
