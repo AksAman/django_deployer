@@ -117,6 +117,8 @@ def create_postgres_resources(
             f.write(line)
 
         sql_script_path.chmod(0o777)
+        # chown
+        run_command(["chown", "postgres:postgres", str(sql_script_path.absolute())], use_sudo=True)
         sql_script_path_str = str(sql_script_path.absolute())
         print("-" * 50)
         print(line)
