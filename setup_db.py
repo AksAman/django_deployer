@@ -146,24 +146,32 @@ def migrate_db(django_project_path: Path):
     logger.info("Database migrated")
 
 
+def load_env_from_line(line: str):
+    line = line.strip()
+    if not line or line.startswith("#"):
+        return
+    key, value = line.split("=", 1)
+    key = key.strip()
+    value = value.strip()
+    os.environ[key] = value
+
+
+def load_dotenv_from_file(env_file_path: Path):
+    with open(env_file_path, "r") as f:
+        for line in f:
+            load_env_from_line(line)
+
+
 @click.command()
 @click.option("--root-path", prompt="Root Path", help="Path to store project files")
 @click.option("--project-name", prompt="Project name", help="Project name")
-@click.option("--db-name", prompt="Database name", help="Database name")
-@click.option("--db-user", prompt="Database user", help="Database user")
-@click.option("--db-password", prompt="Database password", help="Database password")
-@click.option("--db-host", prompt="Database host", help="Database host")
-@click.option("--db-port", prompt="Database port", help="Database port")
+@click.option("--env-file", default=".env", help="Path to .env file")
 @click.option("--execute-sql/--no-execute-sql", prompt="Execute SQL", help="Execute SQL", default=True)
 @click.option("--migrate/--no-migrate", prompt="Migrate", help="Migrate", default=True)
 def main(
     root_path: str,
     project_name: str,
-    db_name: str,
-    db_user: str,
-    db_password: str,
-    db_host: str,
-    db_port: str,
+    env_file: str,
     execute_sql: bool,
     migrate: bool,
 ):
@@ -171,6 +179,19 @@ def main(
     PROJECT_NAME = project_name
     home_dir = Path(root_path)
     project_dir = home_dir.joinpath(project_name).joinpath(project_name)
+
+    env_file_path = Path(env_file)
+    if not env_file_path.exists():
+        logger.error(f"No .env file found at {str(env_file_path)}")
+        return
+
+    load_dotenv_from_file(env_file_path)
+
+    db_name = os.environ.get("DB_NAME")
+    db_user = os.environ.get("DB_USER")
+    db_password = os.environ.get("DB_PASSWORD")
+    db_host = os.environ.get("DB_HOST")
+    db_port = os.environ.get("DB_PORT")
 
     create_postgres_resources(db_name, db_user, db_password, db_host, db_port, execute_sql)
     if migrate:

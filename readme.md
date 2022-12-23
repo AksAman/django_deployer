@@ -43,15 +43,11 @@ Usage: setup_db.py [OPTIONS]
 Options:
   --root-path TEXT                Path to store project files
   --project-name TEXT             Project name
-  --db-name TEXT                  Database name
-  --db-user TEXT                  Database user
-  --db-password TEXT              Database password
-  --db-host TEXT                  Database host
-  --db-port TEXT                  Database port
+  --env-file TEXT                 Path to .env file (Loads Database Variables from this file)
   --execute-sql / --no-execute-sql
                                   Execute SQL
   --migrate / --no-migrate        Migrate
-  --help                          Show this message and exit.
+  --help                          Show this message and exit
 ```
 
 
