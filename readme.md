@@ -23,17 +23,37 @@ project_name # just a parent folder to hold all the files which should not be in
 
 ### Usage
 ```
+Usage: deploy.py [OPTIONS]
+
 Options:
+  --root-path TEXT                Path to store project files
   --project-name TEXT             Project name
   --sudo / --no-sudo              Use sudo
   --git-repo TEXT                 Git repo
   --git-branch TEXT               Git branch
   --domain-name TEXT              Domain
-  --migrate / --no-migrate        Migrate
   --collectstatic / --no-collectstatic
                                   Collect static
+  --help                          Show this message and exit.                         Show this message and exit.
+```
+
+```
+Usage: setup_db.py [OPTIONS]
+
+Options:
+  --root-path TEXT                Path to store project files
+  --project-name TEXT             Project name
+  --db-name TEXT                  Database name
+  --db-user TEXT                  Database user
+  --db-password TEXT              Database password
+  --db-host TEXT                  Database host
+  --db-port TEXT                  Database port
+  --execute-sql / --no-execute-sql
+                                  Execute SQL
+  --migrate / --no-migrate        Migrate
   --help                          Show this message and exit.
 ```
+
 
 ### Example
 ```
