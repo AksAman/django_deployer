@@ -18,7 +18,6 @@ VENV_ACTIVE = False
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-artifacts_dir = Path().home().joinpath(".deployment_artifacts")
 
 
 class DeploymentException(Exception):
@@ -100,7 +99,9 @@ def restart_services():
 
 
 @raise_for_deployment()
-def create_postgres_resources(db_name, db_user, db_password, db_host, db_port, execute_sql: bool = True):
+def create_postgres_resources(
+    artifacts_dir: Path, db_name, db_user, db_password, db_host, db_port, execute_sql: bool = True
+):
     line = ""
     line += f"CREATE DATABASE {db_name};\n"
     line += f"CREATE USER {db_user} WITH PASSWORD '{db_password}';\n"
@@ -179,6 +180,7 @@ def main(
     PROJECT_NAME = project_name
     home_dir = Path(root_path)
     project_dir = home_dir.joinpath(project_name).joinpath(project_name)
+    artifacts_dir = home_dir.joinpath(".deployment_artifacts")
 
     env_file_path = Path(env_file)
     if not env_file_path.exists():
@@ -193,7 +195,7 @@ def main(
     db_host = os.environ.get("DB_HOST")
     db_port = os.environ.get("DB_PORT")
 
-    create_postgres_resources(db_name, db_user, db_password, db_host, db_port, execute_sql)
+    create_postgres_resources(artifacts_dir, db_name, db_user, db_password, db_host, db_port, execute_sql)
     if migrate:
         if "VIRTUAL_ENV" not in os.environ:
             raise DeploymentException("Virtualenv not activated, please activate it first")
