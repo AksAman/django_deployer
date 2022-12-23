@@ -59,7 +59,7 @@ def raise_for_deployment():
             try:
                 func(*args, **kwargs)
             except DeploymentException as e:
-                logger.error(e)
+                logger.exception(e)
                 exit(1)
 
         return wrapper
