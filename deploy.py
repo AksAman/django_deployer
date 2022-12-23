@@ -202,45 +202,6 @@ def install_python_packages():
 
 
 @raise_for_deployment()
-@update_stage("create_postgres_resources")
-def create_postgres_resources(db_name, db_user, db_password, db_host, db_port):
-    # try:
-    #     import psycopg2
-    # except ImportError:
-    #     logger.info("Installing psycopg2")
-    #     run_command(["pip3", "install", "psycopg2"])
-
-    # logger.info("Creating postgres resources")
-    # # create database
-    # connection = psycopg2.connect(
-    #     host=db_host,
-    #     port=db_port,
-    #     user=db_user,
-    #     password=db_password,
-    # )
-    line = ""
-    line += f"CREATE DATABASE {db_name};\n"
-    line += f"CREATE USER {db_user} WITH PASSWORD '{db_password}';\n"
-    line += f"ALTER ROLE {db_user} SET client_encoding TO 'utf8';\n"
-    line += f"ALTER ROLE {db_user} SET default_transaction_isolation TO 'read committed';\n"
-    line += f"ALTER ROLE {db_user} SET timezone TO 'Asia/Kolkata';\n"
-    line += f"GRANT ALL PRIVILEGES ON DATABASE {db_name} TO {db_user};\n"
-    line += f"ALTER ROLE {db_user} SUPERUSER;"
-
-    sql_script_path = artifacts_dir.joinpath("create_db.sql")
-    if sql_script_path.exists():
-        sql_script_path.unlink()
-    with open(sql_script_path, "w") as f:
-        f.write(line)
-
-    sql_script_path.chmod(0o777)
-    sql_script_path_str = str(sql_script_path.absolute())
-
-    run_command(["sudo", "su", "postgres", "-c", f"psql -f {sql_script_path_str}"], use_sudo=False)
-    logger.info("Postgres resources created")
-
-
-@raise_for_deployment()
 @update_stage("create_project_dir")
 def create_project_dir(project_dir: Path):
     logger.info("Creating project dir")
@@ -322,15 +283,6 @@ def install_project_dependencies(venv_path: str, project_dir: Path):
     requirements_file_str = str(requirements_file.absolute())
     run_command(["pip3", "install", "-r", requirements_file_str], use_sudo=False)
     logger.info("Project dependencies installed")
-
-
-@update_stage("migrate_db")
-def migrate_db(venv_path: str, django_project_path: Path):
-    activate_venv(venv_path)
-    logger.info("Migrating database")
-    django_project_path_str = str(django_project_path.absolute())
-    run_command(["python3", f"{django_project_path_str}/manage.py", "migrate"], use_sudo=False)
-    logger.info("Database migrated")
 
 
 @raise_for_deployment()
@@ -445,33 +397,19 @@ def setup_nginx(django_project_path: Path, domain_name: Optional[str]):
 @click.option("--root-path", prompt="Root Path", help="Path to store project files")
 @click.option("--project-name", prompt="Project name", help="Project name")
 @click.option("--sudo/--no-sudo", prompt="Use sudo", help="Use sudo", default=True)
-# @click.option("--db-name", prompt="Database name", help="Database name")
-# @click.option("--db-user", prompt="Database user", help="Database user")
-# @click.option("--db-password", prompt="Database password", help="Database password")
-# @click.option("--db-host", prompt="Database host", help="Database host")
-# @click.option("--db-port", prompt="Database port", help="Database port")
 @click.option("--git-repo", prompt="Git repo", help="Git repo")
 @click.option("--git-branch", prompt="Git branch", help="Git branch", default="master")
-@click.option("--domain-name", prompt="Domain", help="Domain", default=None)
-@click.option("--migrate/--no-migrate", prompt="Migrate", help="Migrate", default=True)
+@click.option("--domain-name", prompt="Domain", help="Domain", default=None, required=False)
 @click.option("--collectstatic/--no-collectstatic", prompt="Collect static", help="Collect static", default=True)
 def main(
     root_path: str,
     project_name: str,
     sudo: bool,
-    # db_name: str,
-    # db_user: str,
-    # db_password: str,
-    # db_host: str,
-    # db_port: str,
     git_repo: str,
     git_branch: str,
     domain_name: Optional[str] = None,
-    migrate: bool = True,
     collectstatic: bool = True,
 ):
-    # print(f"{sudo=} {db_name=} {db_user=} {db_password=} {db_host=} {db_port=} {git_repo=}")
-    # print all cli options
     global PROJECT_NAME
     PROJECT_NAME = project_name
     home_dir = Path(root_path)
@@ -482,8 +420,6 @@ def main(
     update_system(use_sudo=sudo)
     install_apt_packages(use_sudo=sudo)
     install_python_packages()
-    # create_postgres_resources(db_name, db_user, db_password, db_host, db_port)
-    # get home dir
     project_dir = home_dir.joinpath(project_name).joinpath(project_name)
     logger.info(f"Project dir: {project_dir}")
 
@@ -496,9 +432,6 @@ def main(
 
     install_create_activate_virtualenv(project_dir=project_dir, venv_path=venv_path)
     install_project_dependencies(venv_path=venv_path_str, project_dir=project_dir)
-
-    if migrate:
-        migrate_db(venv_path=venv_path_str, django_project_path=project_dir)
 
     if collectstatic:
         collect_static(venv_path=venv_path_str, django_project_path=project_dir)

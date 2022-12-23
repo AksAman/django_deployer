@@ -10,6 +10,17 @@ This project automates the deployment of Django projects to a server using gunic
 4. Install the requirements: `pip install -r requirements.txt`
 5. Run the deployer: `python deployer.py`
 
+### Assumptions
+1. The project is a Django project.
+2. The project is hosted on a git repository.
+3. Thr project has following structure on the server:
+```
+project_name # just a parent folder to hold all the files which should not be included in the git repo
+  |-- project_name # project folder, here the project will be cloned without any subdirectory as the git repo name
+  |-- venv
+```
+
+
 ### Usage
 ```
 Options:
