@@ -118,6 +118,9 @@ def create_postgres_resources(
 
         sql_script_path.chmod(0o777)
         sql_script_path_str = str(sql_script_path.absolute())
+        print("-" * 50)
+        print(line)
+        print("-" * 50)
 
         logger.info(f"SQL Script Path: {sql_script_path_str}")
 
