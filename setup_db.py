@@ -119,6 +119,9 @@ def create_postgres_resources(
         sql_script_path.chmod(0o777)
         sql_script_path_str = str(sql_script_path.absolute())
 
+        logger.info(f"SQL Script Path: {sql_script_path_str}")
+
+        logger.info("Creating postgres resources")
         run_command(["sudo", "su", "postgres", "-c", f"psql -f {sql_script_path_str}"], use_sudo=False)
         logger.info("Postgres resources created")
     else:
