@@ -202,7 +202,7 @@ def main(
 
         restart_services()
     except DeploymentException as e:
-        logger.error(e)
+        logger.exception(e)
     except Exception as e:
         logger.exception(e)
         raise e
