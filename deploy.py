@@ -211,7 +211,7 @@ def create_project_dir(project_dir: Path):
 
 @raise_for_deployment()
 @update_stage("clone_git_repo")
-def clone_git_repo(repo_url: str, branch: str = "master", destination_dir: Path = Path(".")):
+def clone_git_repo(repo_url: str, branch: str = "master", destination_dir: Path = Path(__file__)):
     """
     Clones the git repo in the destination directory
     :param repo_url: The url of the git repo
@@ -317,7 +317,7 @@ def get_gunicorn_path(venv_path: str):
 def write_gunicorn_config_files(gunicorn_path: str, django_project_path: Path):
     def write_gunicorn_socket():
         try:
-            src = Path(".").joinpath("templates/gunicorn.socket")
+            src = Path(__file__).joinpath("templates/gunicorn.socket")
             with open(src, "r") as f:
                 content = f.read()
 
@@ -329,7 +329,7 @@ def write_gunicorn_config_files(gunicorn_path: str, django_project_path: Path):
 
     def write_gunicorn_service():
         try:
-            src = Path(".").joinpath("templates/gunicorn.service")
+            src = Path(__file__).joinpath("templates/gunicorn.service")
             with open(src, "r") as f:
                 content = f.read()
 
@@ -371,7 +371,7 @@ def setup_nginx(django_project_path: Path, domain_name: Optional[str]):
     project_name = django_project_path.name
     django_project_path_str = str(django_project_path.absolute())
     try:
-        src = Path(".").joinpath("templates/nginx.conf")
+        src = Path(__file__).joinpath("templates/nginx.conf")
         with open(src, "r") as f:
             content = f.read()
 
