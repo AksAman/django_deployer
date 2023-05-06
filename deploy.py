@@ -230,7 +230,7 @@ def clone_git_repo(repo_url: str, branch: str = "master", destination_dir: Path 
 
 def pull_latest_changes(project_dir: Path):
     current_dir = os.getcwd()
-    logger.info("Pulling latest changes")
+    logger.info("Pulling latest changes", "current_dir", current_dir)
     os.chdir(project_dir)
     run_command(["git", "pull"], use_sudo=False)
     os.chdir(current_dir)
