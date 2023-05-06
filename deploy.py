@@ -15,8 +15,8 @@ from typing import List, Optional
 
 VENV_ACTIVE = False
 PROJECT_NAME = None
-gunicorn_service_path = f"/etc/systemd/system/gunicorn.service"
-gunicorn_socket_path = f"/etc/systemd/system/gunicorn.socket"
+gunicorn_service_path = "/etc/systemd/system/gunicorn.service"
+gunicorn_socket_path = "/etc/systemd/system/gunicorn.socket"
 nginx_root_path = "/etc/nginx/sites-available"
 
 
@@ -71,6 +71,7 @@ def get_public_ip() -> Optional[str]:
         ip = ip.decode("utf-8").strip()
         return ip
     except Exception as e:
+        logger.error(e)
         return None
 
 
@@ -275,7 +276,6 @@ def install_create_activate_virtualenv(project_dir: Path, venv_path: Path):
 def install_project_dependencies(venv_path: str, project_dir: Path):
     activate_venv(venv_path)
     logger.info("Installing project dependencies")
-    project_dir_str = str(project_dir.absolute())
     requirements_file = project_dir.joinpath("requirements.txt")
     if not requirements_file.exists():
         requirements_file = project_dir.joinpath("chill.requirements.txt")
@@ -355,7 +355,7 @@ def write_gunicorn_config_files(gunicorn_path: str, django_project_path: Path):
     logger.info("Writing gunicorn config files")
     django_project_path_str = str(django_project_path.absolute())
 
-    logger.info(f"Creating gunicorn.socket file")
+    logger.info("Creating gunicorn.socket file")
     write_gunicorn_socket()
     write_gunicorn_service()
 
@@ -390,7 +390,7 @@ def setup_nginx(django_project_path: Path, domain_name: Optional[str]):
         raise DeploymentException("Error creating nginx config file")
 
     # enable nginx config file
-    run_command(["ln", "-s", nginx_config_path, f"/etc/nginx/sites-enabled"], use_sudo=True, raise_on_error=False)
+    run_command(["ln", "-s", nginx_config_path, "/etc/nginx/sites-enabled"], use_sudo=True, raise_on_error=False)
 
     # remove default nginx config file
     # run_command(["rm", f"/etc/nginx/sites-enabled/default"], use_sudo=True)
