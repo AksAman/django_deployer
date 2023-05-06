@@ -18,6 +18,7 @@ PROJECT_NAME = None
 gunicorn_service_path = "/etc/systemd/system/gunicorn.service"
 gunicorn_socket_path = "/etc/systemd/system/gunicorn.socket"
 nginx_root_path = "/etc/nginx/sites-available"
+nginx_sites_enabled_path = "/etc/nginx/sites-enabled"
 
 
 logging.basicConfig(level=logging.INFO)
@@ -390,7 +391,7 @@ def setup_nginx(django_project_path: Path, domain_name: Optional[str]):
         raise DeploymentException("Error creating nginx config file")
 
     # enable nginx config file
-    run_command(["ln", "-s", nginx_config_path, "/etc/nginx/sites-enabled"], use_sudo=True, raise_on_error=False)
+    run_command(["ln", "-s", nginx_config_path, nginx_sites_enabled_path], use_sudo=True, raise_on_error=False)
 
     # remove default nginx config file
     # run_command(["rm", f"/etc/nginx/sites-enabled/default"], use_sudo=True)
