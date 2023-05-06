@@ -232,7 +232,10 @@ def pull_latest_changes(project_dir: Path):
     current_dir = os.getcwd()
     logger.info("Pulling latest changes", "current_dir", current_dir)
     os.chdir(project_dir)
-    run_command(["git", "pull"], use_sudo=False)
+    try:
+        run_command(["git", "pull"], use_sudo=False)
+    except Exception as e:
+        logger.error(e)
     os.chdir(current_dir)
     return
 
