@@ -15,11 +15,14 @@ from typing import List, Optional
 
 VENV_ACTIVE = False
 PROJECT_NAME = None
-gunicorn_service_path = "/etc/systemd/system/gunicorn.service"
-gunicorn_socket_path = "/etc/systemd/system/gunicorn.socket"
-nginx_root_path = "/etc/nginx/sites-available"
-nginx_sites_enabled_path = "/etc/nginx/sites-enabled"
-
+# gunicorn_service_path = "/etc/systemd/system/gunicorn.service"
+# gunicorn_socket_path = "/etc/systemd/system/gunicorn.socket"
+gunicorn_service_path="/home/aman/gunicorn.service.template"
+gunicorn_socket_path="/home/aman/gunicorn.socket.template"
+#nginx_root_path = "/etc/nginx/sites-available"
+#nginx_sites_enabled_path = "/etc/nginx/sites-enabled"
+nginx_root_path = "/home/aman/nginx/templates"
+nginx_sites_enabled_path = "/home/aman/templates/nginx-sites-enabled.template"
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -232,7 +235,7 @@ def clone_git_repo(repo_url: str, branch: str = "master", destination_dir: Path 
 
 def pull_latest_changes(project_dir: Path):
     current_dir = os.getcwd()
-    logger.info("Pulling latest changes", "current_dir", current_dir)
+    logger.info(f"Pulling latest changes, current_dir, {current_dir}")
     os.chdir(project_dir)
     try:
         run_command(["git", "pull"], use_sudo=False)
@@ -382,7 +385,8 @@ def setup_nginx(django_project_path: Path, domain_name: Optional[str]):
         # vars = {{DOMAIN}}, {{PROJECT_PATH}}
         content = content.replace("{{DOMAIN_NAME}}", domain_name)
         content = content.replace("{{PROJECT_PATH}}", django_project_path_str)
-
+        nginx_root = Path(nginx_root_path)
+        nginx_root.mkdir(exist_ok=True, parents=True)
         nginx_config_path = f"{nginx_root_path}/{project_name}"
         with open(nginx_config_path, "w") as f:
             f.write(content)
