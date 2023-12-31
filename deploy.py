@@ -63,6 +63,7 @@ class InstallationException(Exception):
 def run_command(command: List[str], use_sudo: bool = True, raise_on_error: bool = True):
     if use_sudo:
         command = ["sudo"] + command
+    logger.info(f"Running command: {' '.join(command)}")
     process = subprocess.run(command)
     if process.returncode != 0 and raise_on_error:
         raise DeploymentException(f"Failed to run command: {command}")
@@ -294,10 +295,10 @@ def install_project_dependencies(venv_path: str, project_dir: Path):
 
 @raise_for_deployment()
 @update_stage("collect_static")
-def collect_static(venv_path: str, django_project_path: Path):
+def collect_static(venv_path: str, django_project_path: Path, sub_dir: Path | None = None):
     activate_venv(venv_path)
     logger.info("Collecting static")
-    django_project_path_str = str(django_project_path.absolute())
+    django_project_path_str = str(django_project_path.absolute()) if not sub_dir else str(django_project_path.joinpath(sub_dir).absolute())
     run_command(["python3", f"{django_project_path_str}/manage.py", "collectstatic", "--no-input"], use_sudo=False)
     logger.info("Static collected")
 
@@ -321,7 +322,7 @@ def get_gunicorn_path(venv_path: str):
 
 @raise_for_deployment()
 @update_stage("write_gunicorn_config_files")
-def write_gunicorn_config_files(gunicorn_path: str, django_project_path: Path):
+def write_gunicorn_config_files(gunicorn_path: str, django_project_path: Path, sub_dir: Path | None = None):
     def write_gunicorn_socket():
         try:
             src = Path(__file__).parent.joinpath("templates/gunicorn.socket")
@@ -357,7 +358,7 @@ def write_gunicorn_config_files(gunicorn_path: str, django_project_path: Path):
             raise DeploymentException("Error creating gunicorn.service file")
 
     logger.info("Writing gunicorn config files")
-    django_project_path_str = str(django_project_path.absolute())
+    django_project_path_str = str(django_project_path.absolute()) if not sub_dir else str(django_project_path.joinpath(sub_dir).absolute())
 
     logger.info("Creating gunicorn.socket file")
     write_gunicorn_socket()
@@ -407,6 +408,7 @@ def setup_nginx(django_project_path: Path, domain_name: Optional[str]):
 @click.option("--sudo/--no-sudo", prompt="Use sudo", help="Use sudo", default=True)
 @click.option("--git-repo", prompt="Git repo", help="Git repo")
 @click.option("--git-branch", prompt="Git branch", help="Git branch", default="master")
+@click.option("--sub-dir", prompt="Does project lives under a subdirectory like app, if yes specify the relative path", default=None, required=False)
 @click.option("--domain-name", prompt="Domain", help="Domain", default=None, required=False)
 @click.option("--collectstatic/--no-collectstatic", prompt="Collect static", help="Collect static", default=True)
 def main(
@@ -415,6 +417,7 @@ def main(
     sudo: bool,
     git_repo: str,
     git_branch: str,
+    sub_dir: str | None = None,
     domain_name: Optional[str] = None,
     collectstatic: bool = True,
 ):
@@ -442,11 +445,11 @@ def main(
     install_project_dependencies(venv_path=venv_path_str, project_dir=project_dir)
 
     if collectstatic:
-        collect_static(venv_path=venv_path_str, django_project_path=project_dir)
+        collect_static(venv_path=venv_path_str, django_project_path=project_dir, sub_dir=sub_dir)
 
     install_gunicorn(venv_path=venv_path_str)
     gunicorn_path = get_gunicorn_path(venv_path=venv_path_str)
-    write_gunicorn_config_files(gunicorn_path=gunicorn_path, django_project_path=project_dir)
+    write_gunicorn_config_files(gunicorn_path=gunicorn_path, django_project_path=project_dir, sub_dir=sub_dir)
 
     # setup nginx
     setup_nginx(django_project_path=project_dir, domain_name=domain_name)
