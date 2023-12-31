@@ -377,7 +377,7 @@ def setup_nginx(django_project_path: Path, domain_name: Optional[str]):
 
     # create nginx config file
     project_name = django_project_path.name
-    django_project_path_str = str(django_project_path.absolute())
+    django_project_path_str = str(django_project_path.absolute()) if not sub_dir else str(django_project_path.joinpath(sub_dir).absolute())
     try:
         src = Path(__file__).parent.joinpath("templates/nginx.conf")
         with open(src, "r") as f:
@@ -388,7 +388,7 @@ def setup_nginx(django_project_path: Path, domain_name: Optional[str]):
         content = content.replace("{{PROJECT_PATH}}", django_project_path_str)
         nginx_root = Path(nginx_root_path)
         nginx_root.mkdir(exist_ok=True, parents=True)
-        nginx_config_path = f"{nginx_root_path}/{project_name}"
+        nginx_config_path = f"{nginx_root_path}/app.nginx"
         with open(nginx_config_path, "w") as f:
             f.write(content)
     except Exception as e:

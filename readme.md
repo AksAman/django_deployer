@@ -56,3 +56,59 @@ Options:
 ./deploy.py --project-name="base_django_app" --sudo --git-repo="https://github.com/AksAman/django-base-app" --git-branch="master" --domain-name "example
 .com" --no-migrate --no-collectstatic
 ```
+
+```bash
+python deploy.py \
+  --root-path="root-path" \
+  --project-name="project-name" \
+  --sudo \
+  --git-repo="repo-url" \
+  --sub-dir="app" \
+  --domain-name "example.com" \
+  --no-collectstatic
+```
+
+
+### Setting up Gunicorn and Nginx
+There are some permission issues due to which the script is unable to write the conf files to gunicorn and nginx directories.
+
+Instead it creates template files in the root-path specified as 
+```bash
+gunicorn.service.template
+gunicorn.socket.template
+nginx/templates/app.nginx
+```
+
+Run the following to copy the files to proper directories
+```bash
+sudo cp ~/gunicorn.service.template /etc/systemd/system/gunicorn.service
+sudo cp ~/gunicorn.socket.template /etc/systemd/system/gunicorn.socket
+sudo systemctl start gunicorn.socket
+sudo systemctl enable gunicorn.socket
+sudo systemctl status gunicorn.socket
+
+sudo cp ~/nginx/templates/app.nginx /etc/nginx/sites-available/app.nginx
+sudo ln -s /etc/nginx/sites-available/app.nginx /etc/nginx/sites-enabled
+sudo nginx -t
+
+server_name=$(sudo cat /etc/nginx/sites-available/app.nginx | grep server_name | awk '{print $2}' | tr -d ';')
+echo $server_name
+```
+
+
+### Certbot
+Setup dns record for the server_name
+
+```bash
+server_name=$(sudo cat /etc/nginx/sites-available/app.nginx | grep server_name | awk '{print $2}' | tr -d ';')
+echo $server_name
+
+sudo ufw delete allow 8000
+sudo ufw allow 'Nginx Full'
+sudo apt install certbot python3-certbot-nginx -y
+sudo nano /etc/nginx/sites-available/app.nginx
+# add the domain
+
+sudo certbot --nginx -d $server_name
+sudo certbot renew --dry-run
+```
